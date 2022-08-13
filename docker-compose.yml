@@ -1,0 +1,13 @@
+version: "3.5"
+services:
+  localstack:
+    container_name: localstack-for-spark
+    image: localstack/localstack:1.0.3
+    environment:
+      - SERVICES=dynamodb, kinesis
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_DEFAULT_OUTPUT=json
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+    ports:
+      - 4566:4566

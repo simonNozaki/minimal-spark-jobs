@@ -1,2 +1,7 @@
 *.class
 *.log
+target/
+project/target/
+.idea/
+!.idea/gradle.xml
+!.idea/misc.xml
