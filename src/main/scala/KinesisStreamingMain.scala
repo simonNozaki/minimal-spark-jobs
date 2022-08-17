@@ -1,34 +1,20 @@
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, DefaultAWSCredentialsProviderChain}
 import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder
+import com.amazonaws.services.kinesis.model.Record
+import org.apache.hadoop.shaded.com.nimbusds.jose.util.StandardCharset
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.streaming.kinesis.KinesisInputDStream
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.joda.time.LocalDateTime
+import org.apache.spark.streaming.kinesis.KinesisInitialPositions
 
 /**
  * Kinesis Data Stream 監視ジョブ
  */
 object KinesisStreamingMain {
-  /**
-   * セッションシングルトンオブジェクト
-   */
-  private object SparkSessionSingleton {
-    @transient private var instance: SparkSession = _
-
-    def getInstance(sparkConf: SparkConf): SparkSession = {
-      if (instance == null) {
-        instance = SparkSession
-          .builder
-          .config(sparkConf)
-          .getOrCreate()
-      }
-      instance
-    }
-  }
-
   private val streamName = "dev-todo-items-data-stream"
+  private val checkpointAppName = "dev-todo-items-stream-checkpoint"
 
   def main(sysArgs: Array[String]): Unit = {
     val sparkConf = new SparkConf()
@@ -55,21 +41,27 @@ object KinesisStreamingMain {
         .streamingContext(ssc)
         .endpointUrl("https://kinesis.ap-northeast-1.amazonaws.com")
         .regionName("ap-northeast-1")
-        .streamName("dev-todo-items-data-stream")
-        .checkpointAppName("dev-todo-items-data-stream-app")
-        .build()
+        .streamName(streamName)
+        .checkpointAppName(checkpointAppName)
+        .initialPosition(new KinesisInitialPositions.TrimHorizon)
+        .buildWithMessageHandler((record: Record) => {
+          StandardCharset.UTF_8.decode(record.getData).toString.split(",")
+        })
     }
 
     ssc
       .union(kinesisStreams)
-      .flatMap(byteArray => new String(byteArray).split(","))
-      .foreachRDD{rdd: RDD[String] => {
+      .foreachRDD{rdd: RDD[Array[String]] => {
         println(s"${LocalDateTime.now.toString} : ストリーミング中...")
-        val sparkSession = SparkSessionSingleton.getInstance(rdd.sparkContext.getConf)
-        import sparkSession.implicits._
 
-        val df = rdd.toDF()
-        df.write.format("console")
+        val reductions = rdd.map { strings =>
+          strings.map { string => s"$string," }
+        }.map { jsons => {
+          // JSONが改行されて一つずつやってくるのでつなげて1行に縮約
+          jsons.reduce { (jsonL: String, jsonR: String) => jsonL + jsonR}
+        }}
+
+        reductions.foreach { json => println(json)}
       }}
 
     ssc.start
