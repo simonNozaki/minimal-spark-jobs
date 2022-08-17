@@ -13,4 +13,4 @@ aws kinesis list-streams \
 aws dynamodb enable-kinesis-streaming-destination \
   --endpoint-url http://localhost:4566 \
   --table-name local-todo-items \
-  --stream-arn "arn:aws:kinesis:us-east-1:000000000000:stream/local-todo-items-data-stream"
+  --stream-arn "arn:aws:kinesis:ap-northeast-1:000000000000:stream/local-todo-items-data-stream"
