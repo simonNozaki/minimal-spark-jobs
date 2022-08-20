@@ -19,5 +19,8 @@ libraryDependencies ++= Seq(
   "org.apache.spark" % "spark-streaming-kinesis-asl_2.13" % "3.3.0",
   // 互換性のために最新のパッケージをいれておく
   "com.amazonaws" % "amazon-kinesis-client" % "1.14.8",
-  "com.amazonaws" % "aws-java-sdk-kinesis" % "1.12.280"
+  "com.amazonaws" % "aws-java-sdk-kinesis" % "1.12.280",
+  "com.amazonaws" % "aws-lambda-java-events" % "3.11.0",
+  // deserializer
+  "com.google.code.gson" % "gson" % "2.9.1"
 )
