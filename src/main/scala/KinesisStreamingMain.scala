@@ -14,6 +14,7 @@ import org.apache.spark.streaming.kinesis.KinesisInitialPositions
 
 import java.nio.file.{Files, Paths}
 import java.util.UUID
+import scala.util.{Failure, Success, Try}
 
 /**
  * Kinesis Data Stream 監視ジョブ
@@ -57,7 +58,7 @@ object KinesisStreamingMain {
     .withCredentials(defaultCredentialProvider)
     .build()
 
-  private val bucket = ""
+  private val bucket = "dev-todo-items"
 
   /**
    * Todo要素
@@ -87,7 +88,7 @@ object KinesisStreamingMain {
     val newImage = streamRecord.getDynamodb.getNewImage
     TodoItem(
       id = newImage.get("id").getS,
-      timestamp = newImage.get("state").getN.toInt,
+      timestamp = newImage.get("timestamp").getN.toInt,
       state = newImage.get("state").getS,
       title = newImage.get("title").getS,
       createdAt = newImage.get("createdAt").getS,
@@ -151,14 +152,22 @@ object KinesisStreamingMain {
             record
           }}
 
-        // JSONファイルにしてs3に置く
-        streamRecords
+        // JSONファイルにする
+        val files = streamRecords
           .map { r => createTodoItem(r)}
           .map { todoItem => {
             val newFile = Paths.get(s"${LocalDateTime.now()}_${UUID.randomUUID().toString}.json")
             Files.writeString(newFile, gson.toJson(todoItem)).toFile
           }}
-          .foreach { file => s3.putObject(bucket, file.getName, file)}
+
+        // s3に置く
+        files
+          .map { file => Try(s3.putObject(bucket, file.getName, file))}
+          .foreach {
+            case Success(value) => println(s"バケットへのpushに成功しました: ${value.toString}")
+            case Failure(exception) => println(s"バケットへのpushに失敗しました: ${exception.printStackTrace()}")
+          }
+
       }}
 
     ssc.start
